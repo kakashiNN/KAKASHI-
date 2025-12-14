@@ -1,72 +1,63 @@
 const axios = require("axios");
-const fs = require("fs-extra");
-const path = require("path");
 
 module.exports = {
- config: {
- name: "anime",
- aliases: ["waifu", "neko", "shinobu", "megumin", "bully", "cuddle", "cry", "hug", "awoo", "kiss", "lick", "pat", "smug", "bonk", "yeet", "blush", "smile", "wave", "highfive", "handhold", "nom", "bite", "glomp", "slap", "kill", "kick", "happy", "wink", "poke", "dance", "cringe"],
- version: "1.4.0",
- author: "Chitron Bhattacharjee",
- countDown: 10,
- role: 0,
- shortDescription: {
- en: "Get random anime-style images with live feedback"
- },
- longDescription: {
- en: "Fetch and send random anime-style images of various categories from the waifu.pics API, with real-time feedback through message reactions."
- },
- category: "anime",
- guide: {
- en: "{prefix}anime [category]\n\nAvailable categories: waifu, neko, shinobu, megumin, bully, cuddle, cry, hug, awoo, kiss, lick, pat, smug, bonk, yeet, blush, smile, wave, highfive, handhold, nom, bite, glomp, slap, kill, kick, happy, wink, poke, dance, cringe"
- }
- },
+  config: {
+    name: "anime",
+    aliases: ["ani"],
+    version: "1.0",
+    author: "‎MAHABUB + modified by NIROB",
+    countDown: 10,
+    role: 0,
+    shortDescription: "anime videos",
+    longDescription: "anime videos from mahabub",
+    category: "user",
+    guide: "{p}{n}rv",
+  },
 
- onStart: async function ({ api, event, args }) {
- const validCategories = ["waifu", "neko", "shinobu", "megumin", "bully", "cuddle", "cry", "hug", "awoo", "kiss", "lick", "pat", "smug", "bonk", "yeet", "blush", "smile", "wave", "highfive", "handhold", "nom", "bite", "glomp", "slap", "kill", "kick", "happy", "wink", "poke", "dance", "cringe"];
- 
- let category = args[0]?.toLowerCase() || "waifu";
- 
- if (!validCategories.includes(category)) {
- api.setMessageReaction("❓", event.messageID, (err) => {}, true);
- return api.sendMessage(`Invalid category. Available categories are: ${validCategories.join(", ")}`, event.threadID, event.messageID);
- }
+  onStart: async function ({ api, event, message }) {
+    const senderID = event.senderID;
 
- api.setMessageReaction("⏳", event.messageID, (err) => {}, true);
+    // লোডিং মেসেজ পাঠানো
+    const loadingMessage = await message.reply({
+      body: `Loading random video... Please wait! (up to 5 sec)...
+𝐍𝐨𝐰 𝐥𝐨𝐚𝐝𝐢𝐧𝐠. . .
+█▒▒▒▒▒▒▒▒▒
+███▒▒▒▒▒▒▒
+█████▒▒▒▒▒
+██████▒▒▒▒
+████████▒▒
+██████████`,
+    });
 
- try {
- const response = await axios.get(`https://api.waifu.pics/sfw/${category}`);
- const imageUrl = response.data.url;
+    // JSON ফাইলের URL
+    const jsonUrl = "https://raw.githubusercontent.com/nirob-kakashi66/anime_json/main/NIROB.json";
 
- const imageName = `${category}.jpg`;
- const imagePath = path.join(__dirname, 'cache', imageName);
+    try {
+      // JSON ফাইল থেকে ডাটা নিয়ে আসা
+      const response = await axios.get(jsonUrl);
+      const data = response.data;
 
- const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
- await fs.outputFile(imagePath, imageResponse.data);
+      if (!data.videos || data.videos.length === 0) {
+        return message.reply("No videos available.");
+      }
 
- api.setMessageReaction("🖼️", event.messageID, (err) => {}, true);
+      // এলোমেলো একটি ভিডিও লিংক নির্বাচন
+      const randomVideo = data.videos[Math.floor(Math.random() * data.videos.length)];
 
- await api.sendMessage(
- {
- attachment: fs.createReadStream(imagePath),
- body: `🌸 Here's your random ${category} image:`
- },
- event.threadID,
- (err, info) => {
- if (err) {
- console.error(`Error sending image for ${category}:`, err);
- api.setMessageReaction("❌", event.messageID, (err) => {}, true);
- } else {
- api.setMessageReaction("✅", event.messageID, (err) => {}, true);
- }
- }
- );
+      // এলোমেলো একটি মেসেজ নির্বাচন (যদি থাকে)
+      const randomMessage = data.messages && data.messages.length > 0
+        ? data.messages[Math.floor(Math.random() * data.messages.length)]
+        : "❰ ANIME VIDEO ❱"; // ডিফল্ট মেসেজ
 
- await fs.remove(imagePath);
- } catch (error) {
- console.error(`Error in anime command (${category}):`, error);
- api.sendMessage(`Sorry, I couldn't fetch a ${category} image right now. Please try again later.`, event.threadID, event.messageID);
- api.setMessageReaction("❌", event.messageID, (err) => {}, true);
- }
- }
+      // ভিডিও পাঠানো
+      message.reply({
+        body: randomMessage,
+        attachment: await global.utils.getStreamFromURL(randomVideo),
+      });
+
+    } catch (error) {
+      console.error("Error fetching video links:", error);
+      return message.reply("Failed to load video. Please try again later.");
+    }
+  }
 };

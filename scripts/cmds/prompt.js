@@ -3,49 +3,44 @@ const axios = require("axios");
 module.exports = {
   config: {
     name: "prompt",
-    aliases: ["imgprompt"],
-    version: "1.0.0",
-    author: "mahabub",
+    version: "1.0",
+    author: "@RI F AT",
+    countDown: 5,
     role: 0,
     shortDescription: {
-      en: "Generate a text prompt from an image"
+      en: "Generate AI image prompt from image"
     },
     longDescription: {
-      en: "Generate a text prompt from an image using API"
+      en: "Generate a detailed AI prompt from an image"
     },
     category: "ai",
     guide: {
-      en: "{p}prompt (reply to an image)"
+      en: "{pn}\nReply to an image with this command."
     }
   },
 
-  onStart: async function ({ api, event }) {
+  onStart: async function ({ message, event }) {
+    if (
+      !event.messageReply ||
+      !event.messageReply.attachments?.[0]?.type?.startsWith("photo")
+    ) {
+      return message.reply("Please reply to an image to generate a prompt.");
+    }
+
+    const imgURL = event.messageReply.attachments[0].url;
+    const apiUrl = `https://rifatapi-sooty.vercel.app/api/prompt?img=${encodeURIComponent(imgURL)}`;
+
     try {
-      if (!event.messageReply || !event.messageReply.attachments || event.messageReply.attachments.length === 0) {
-        return api.sendMessage("⚠ Please reply to an image.", event.threadID, event.messageID);
-      }
-
-      const attachment = event.messageReply.attachments[0];
-      if (attachment.type !== "photo") {
-        return api.sendMessage("⚠ Only image attachments are supported.", event.threadID, event.messageID);
-      }
-
-      const imageUrl = attachment.url;
-      const response = await axios.get(
-        `https://mahabub-prompt-api.vercel.app/api/prompt?url=${encodeURIComponent(imageUrl)}`
-      );
-
-      if (response.data && response.data.prompt) {
-        return api.sendMessage(
-          `📝 Prompt generated \n\n${response.data.prompt}`,
-          event.threadID,
-          event.messageID
-        );
+      const res = await axios.get(apiUrl);
+   
+      if (res.data?.data?.prompt) {
+        return message.reply(res.data.data.prompt); 
       } else {
-        return api.sendMessage("❌ No prompt found in response.", event.threadID, event.messageID);
+        return message.reply("Failed to get a valid prompt from API.");
       }
-    } catch (error) {
-      return api.sendMessage("❌ Error while generating prompt.", event.threadID, event.messageID);
+    } catch (err) {
+      console.error("Prompt fetch error:", err.message);
+      return message.reply("Failed to generate prompt. Please try again later.");
     }
   }
 };
